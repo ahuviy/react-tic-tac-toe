@@ -13,8 +13,16 @@ ol, ul {
   display: table;
 }
 
+.square.highlight {
+  background: yellow;
+}
+
 .status {
   margin-bottom: 10px;
+}
+
+.bold {
+  font-weight: bold;
 }
 
 .square {

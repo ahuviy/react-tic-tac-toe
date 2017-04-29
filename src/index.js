@@ -1,40 +1,35 @@
+/*global _*/
 import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
 
 function Square(props) {
     return (
-        <button className="square" onClick={() => props.onClick()}>
-            {props.value}
+        <button
+            key={props.key}
+            className={props.highlight ? "square highlight" : "square"}
+            onClick={() => props.onClick()}>
+                {props.value}
         </button>
     );
 }
 
 class Board extends React.Component {
-    renderSquare(i) {
-        return Square({
-            value: this.props.squares[i],
-            onClick: () => this.props.onClick(i)
-        });
-    }
     render() {
         return (
             <div>
-                <div className="board-row">
-                    {this.renderSquare(0)}
-                    {this.renderSquare(1)}
-                    {this.renderSquare(2)}
-                </div>
-                <div className="board-row">
-                    {this.renderSquare(3)}
-                    {this.renderSquare(4)}
-                    {this.renderSquare(5)}
-                </div>
-                <div className="board-row">
-                    {this.renderSquare(6)}
-                    {this.renderSquare(7)}
-                    {this.renderSquare(8)}
-                </div>
+                {this.props.squares.map((row, i) => {
+                    return (
+                        <div key={i} className="board-row">
+                            {row.map((col, j) => Square({
+                                value: this.props.squares[i][j],
+                                onClick: () => this.props.onClick(i, j),
+                                key: j,
+                                highlight: this.props.winnerSquares && this.props.winnerSquares.find(sq => sq[0] === i && sq[1] === j)
+                            }))}
+                        </div>
+                    );
+                })}
             </div>
         );
     }
@@ -45,20 +40,27 @@ class Game extends React.Component {
         super();
         this.state = {
             history: [
-                { squares: Array(9).fill(null) }
+                {
+                    squares: [
+                        Array(3).fill(null),
+                        Array(3).fill(null),
+                        Array(3).fill(null)
+                    ]
+                }
             ],
             stepNumber: 0,
-            xIsNext: true
+            xIsNext: true,
+            ascending: false
         };
     }
-    handleClick(i) {
+    handleClick(i, j) {
         const history = this.state.history.slice(0, this.state.stepNumber + 1);
         const current = history[history.length - 1];
-        const squares = current.squares.slice();
-        if (calculateWinner(squares) || squares[i]) {
+        const squares = _.cloneDeep(current.squares);
+        if (calculateWinner(squares) || squares[i][j]) {
             return;
         }
-        squares[i] = this.state.xIsNext ? 'X' : 'O';
+        squares[i][j] = this.state.xIsNext ? 'X' : 'O';
         this.setState({
             history: history.concat([
                 { squares: squares }
@@ -75,14 +77,22 @@ class Game extends React.Component {
         })
     }
 
+    toggleSort() {
+        let newState = _.cloneDeep(this.state);
+        newState.ascending = !newState.ascending;
+        this.setState(newState);
+    }
+
     render() {
         const history = this.state.history;
         const current = history[this.state.stepNumber];
         const winner = calculateWinner(current.squares);
 
         let status;
+        let winnerSquares;
         if (winner) {
-            status = 'Winner: ' + winner;
+            status = 'Winner: ' + winner.id;
+            winnerSquares = winner.squares;
         } else {
             status = 'Next player: ' + (this.state.xIsNext ? 'X' : 'O');
         }
@@ -90,21 +100,26 @@ class Game extends React.Component {
         const moves = history.map((step, move) => {
             const desc = move ? `Move #${move}` : 'Game start';
             return (
-                <li key={move}>
+                <li key={move} className={this.state.stepNumber === move ? 'bold' : ''}>
                     <a href="#" onClick={() => this.jumpTo(move)}>{desc}</a>
                 </li>
             );
         });
+        if (this.state.ascending) {
+            moves.reverse();
+        }
 
         return (
             <div className="game">
                 <div className="game-board">
                     <Board
                         squares={current.squares}
-                        onClick={i => this.handleClick(i)}
+                        winnerSquares={winnerSquares}
+                        onClick={(i, j) => this.handleClick(i, j)}
                     />
                 </div>
                 <div className="game-info">
+                    <button onClick={() => this.toggleSort()}>sort</button>
                     <div>{status}</div>
                     <ol>{moves}</ol>
                 </div>
@@ -122,19 +137,25 @@ ReactDOM.render(
 
 function calculateWinner(squares) {
     const lines = [
-        [0, 1, 2],
-        [3, 4, 5],
-        [6, 7, 8],
-        [0, 3, 6],
-        [1, 4, 7],
-        [2, 5, 8],
-        [0, 4, 8],
-        [2, 4, 6],
+        [[0, 0], [0, 1], [0, 2]],
+        [[1, 0], [1, 1], [1, 2]],
+        [[2, 0], [2, 1], [2, 2]],
+        [[0, 0], [1, 0], [2, 0]],
+        [[0, 1], [1, 1], [2, 1]],
+        [[0, 2], [1, 2], [2, 2]],
+        [[0, 0], [1, 1], [2, 2]],
+        [[0, 2], [1, 1], [2, 0]],
     ];
     for (let i = 0; i < lines.length; i++) {
-        const [a, b, c] = lines[i];
-        if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
-            return squares[a];
+        let [a, b, c] = lines[i];
+        let s1 = squares[a[0]][a[1]];
+        let s2 = squares[b[0]][b[1]];
+        let s3 = squares[c[0]][c[1]];
+        if (s1 && s1 === s2 && s1 === s3) {
+            return {
+                id: s1,
+                squares: lines[i]
+            };
         }
     }
     return null;
